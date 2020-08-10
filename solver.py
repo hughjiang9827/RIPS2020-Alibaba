@@ -4,6 +4,7 @@ from scipy.linalg import block_diag
 import matplotlib.pyplot as plt
 import time
 from qpsolvers import solve_qp
+import cvxpy as cp
 
 def get_indx_matrix(m, indices):
     return np.array([i * m + np.arange(m) for i in indices])
@@ -12,6 +13,33 @@ def make_PD(P, x=1e-7):
     diag = x * np.identity(len(P))
     return P + diag
 
+# c~n*m, M~n*k*m, d~k, A~n*l*m, b~n*l
+def primal_dual_solver(c, M, A, d, b):
+    # TODO: check
+    n, l, m = A.shape
+    # TODO: do it somewhere else
+    # c = -c
+    c = c.flatten()
+
+    A_ub_sep = block_diag(*A)
+    # TODO: shape of M, d, b, lambd
+    b = b.flatten()
+
+    A_ub_couple = np.concatenate(M, axis=1)
+
+    x = cp.Variable(n * m)
+    constraints = [A_ub_couple @ x <= d, A_ub_sep @ x <= b, 0 <= x]
+    objective = cp.Minimize(cp.sum(c.T @ x))
+    prob = cp.Problem(objective, constraints)
+    prob.solve()
+
+    print("status:", prob.status)
+    print("optimal value", prob.value)
+    argmin_x = x.value
+    lambda_star = constraints[0].dual_value
+
+    return argmin_x, lambda_star
+    
 # c~n*m, M~n*k*m, d~k, A~n*l*m, b~n*l
 def general_basic_solver(c, M, A, d, b, is_coupled=True, augmented=False, P=None):
     # TODO: check
