@@ -37,8 +37,9 @@ def primal_dual_solver(c, M, A, d, b):
     print("optimal value", prob.value)
     argmin_x = x.value
     lambda_star = constraints[0].dual_value
+    optimal_obj = prob.value
 
-    return argmin_x, lambda_star
+    return argmin_x, lambda_star, optimal_obj
     
 # c~n*m, M~n*k*m, d~k, A~n*l*m, b~n*l
 def general_basic_solver(c, M, A, d, b, is_coupled=True, augmented=False, P=None):
@@ -112,8 +113,10 @@ def general_st_sampling_solver(c, M, A, d, b, epoch=10, batch_size=1, alpha=1e-3
                                decay=False, decay_func=None,
                                augmented=False, rho=1, prox_type="IAAL",
                                ascent_type="full", vr_m_order=2,
-                               err_list=[], lambd_list=[], time_hist=[], is_rep=True, is_cyc=False,
-                               answer=[], tol=1e-10):
+                               err_list=[], lambd_list=[], time_hist=[], 
+                               lambda_err_list=[], duality_gap_list=[],
+                               is_rep=True, is_cyc=False,
+                               answer=[], tol=1e-3, optimal_obj=-1, lambda_star=[]):
     # TODO: check
     n, k, m = M.shape
     # convert max to min problem
@@ -122,16 +125,18 @@ def general_st_sampling_solver(c, M, A, d, b, epoch=10, batch_size=1, alpha=1e-3
     # TODO: check
 #     c, M, A, d, b = [np.float_(dt) for dt in [c, M, A, d, b]]
 
-    # TODO: keep track of error
-    if len(answer) == 0:
-        answer = general_basic_solver(c, M, A, d, b)
+    # # TODO: keep track of error
+    # if len(answer) == 0:
+    #     answer = general_basic_solver(c, M, A, d, b)
 
     # initialize lambda and argmin_x
     lambd, argmin_x = np.zeros(k), np.zeros(n * m)
     # TODO
     M_2d = np.concatenate(M, axis=1)
+    c_1d = c.flatten()
     # cache
     dot_cache = np.zeros(k)
+    current_obj = 0
 
     # TODO: VR
     dot_cache_t_prev = np.zeros(k)
@@ -178,6 +183,7 @@ def general_st_sampling_solver(c, M, A, d, b, epoch=10, batch_size=1, alpha=1e-3
 #             print("---")
             prev_Mx = np.matmul(M_2d[:, update_indices], argmin_x[update_indices])
             dot_cache -= prev_Mx
+            current_obj -= np.dot(c_1d[update_indices], argmin_x[update_indices])
 
             # TODO: decay
             decayed_alpha = alpha
@@ -209,6 +215,7 @@ def general_st_sampling_solver(c, M, A, d, b, epoch=10, batch_size=1, alpha=1e-3
             # TODO: check
             d_psi = np.matmul(M_2d[:, update_indices], argmin_x[update_indices])
             dot_cache += d_psi
+            current_obj += np.dot(c_1d[update_indices], argmin_x[update_indices])
 
             # TODO: check
             # lambd += alpha * (dot_cache - d)
@@ -242,17 +249,26 @@ def general_st_sampling_solver(c, M, A, d, b, epoch=10, batch_size=1, alpha=1e-3
         time_hist.append(end_time - start_time)
 
         # TODO: keep track of error and lambd
-        err = np.linalg.norm(argmin_x - answer)
+        # err = np.linalg.norm(argmin_x - answer)
+        err = abs(optimal_obj - current_obj) / abs(optimal_obj)
         err_list.append(err)
         # TODO: check
         lambd_list.append(lambd)
 #          print(lambd)
+        lambda_err = np.linalg.norm(lambd - lambda_star) / np.linalg.norm(lambda_star)
+        lambda_err_list.append(lambda_err) 
+        duality_gap = abs(np.dot(lambd.T, dot_cache - d))
+        duality_gap_list.append(duality_gap)
+        # TODO: Termination
+        if all(dot_cache <= d) and err < tol:
+            break
 
         # TODO: VR
         if s % vr_m_order == 0:
             dot_cache_t_prev = dot_cache
             argmin_x_t_prev = argmin_x
 
+    print(current_obj)
     return argmin_x
 
 def plot_error(err_list, name="Error", required=[]):
