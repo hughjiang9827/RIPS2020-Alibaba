@@ -13,7 +13,7 @@ def sim_data(n, m=10, k=10, l=10, c_bound=10, M_bound=10, A_bound=10, seed=42):
     b = np.random.uniform(m * A_bound / 4, m * A_bound * 3 / 4, size=(n, l))
     return c, M, A, d, b
 
-def sim_once(n, maxit=1000, alpha=1e-3, strategy="IAAL"):
+def sim_once(n, maxit=1000, alpha=1e-4, strategy="IAAL"):
 	# TODO: default values except n
 	c, M, A, d, b = sim_data(n)
 
