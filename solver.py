@@ -33,8 +33,7 @@ def primal_dual_solver(c, M, A, d, b):
     prob = cp.Problem(objective, constraints)
     prob.solve()
 
-    print("status:", prob.status)
-    print("optimal value", prob.value)
+    print("status: {}, optimal value: {}".format(prob.status, prob.value))
     argmin_x = x.value
     lambda_star = constraints[0].dual_value
     optimal_obj = prob.value
@@ -152,6 +151,9 @@ def general_st_sampling_solver(c, M, A, d, b, epoch=10, batch_size=1, alpha=1e-3
     # TODO: keep track of runtime
     start_time = time.time()
     for s in range(epoch):
+        if s == epoch - 1:
+            print("Warning: maxit reached " + prox_type)
+
         # TODO: sample with or without rep?
         if is_rep:
             idx = np.random.randint(n, size=n)
@@ -243,6 +245,14 @@ def general_st_sampling_solver(c, M, A, d, b, epoch=10, batch_size=1, alpha=1e-3
             # counter
             counter += 1
             end_time = time.time()
+
+            # # TODO: keep track of error every iter
+            # err = abs(optimal_obj - current_obj) / abs(optimal_obj)
+            # # TODO: Termination
+            # if all(dot_cache <= d) and err < tol:
+            #     # break
+            #     print(current_obj)
+            #     return argmin_x
 
         # TODO: inner or outer loop
         # TODO: keep track of runtime
