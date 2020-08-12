@@ -115,7 +115,8 @@ def general_st_sampling_solver(c, M, A, d, b, epoch=10, batch_size=1, alpha=1e-3
                                err_list=[], lambd_list=[], time_hist=[], 
                                lambda_err_list=[], duality_gap_list=[],
                                is_rep=True, is_cyc=False,
-                               answer=[], tol=1e-3, optimal_obj=-1, lambda_star=[]):
+                               answer=[], tol=1e-3, optimal_obj=-1, lambda_star=[], 
+                               max_check=[]):
     # TODO: check
     n, k, m = M.shape
     # convert max to min problem
@@ -153,6 +154,7 @@ def general_st_sampling_solver(c, M, A, d, b, epoch=10, batch_size=1, alpha=1e-3
     for s in range(epoch):
         if s == epoch - 1:
             print("Warning: maxit reached " + prox_type)
+            max_check.append("max")
 
         # TODO: sample with or without rep?
         if is_rep:
