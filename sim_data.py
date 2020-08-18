@@ -29,6 +29,7 @@ def sim_once(n, maxit=1000, alpha=1e-4, strategy="IAAL", is_cyc=False,
 	elif strategy == "ADMM":
 		decay = False
 		ascent_type = "vr"
+
 	primal_err_list = []
 	lambd_list = [] 
 	lambda_err_list = []
@@ -42,14 +43,14 @@ def sim_once(n, maxit=1000, alpha=1e-4, strategy="IAAL", is_cyc=False,
 	else:
 		rs = general_st_sampling_solver(c, M, A, d, b, epoch=maxit, batch_size=1, alpha=alpha,
 	                               decay=decay, decay_func=sqrt_decay,
-	                               augmented=True, rho=1, prox_type=strategy,
+	                               augmented=True, prox_type=strategy,
 	                               ascent_type=ascent_type, vr_m_order=2,
 	                               err_list=primal_err_list, lambd_list=lambd_list, time_hist=[], 
 	                               lambda_err_list=lambda_err_list, duality_gap_list=duality_gap_list,
 	                               is_rep=False, is_cyc=is_cyc,
 	                               answer=[], tol=tol, 
 	                               optimal_obj=optimal_obj, lambda_star=lambda_star, 
-	                               max_check=max_check)
+	                               max_check=max_check, use_seed=use_seed)
 	e_time = time.time()
 	total_time = e_time - s_time
 
@@ -71,10 +72,7 @@ def sim_multi(n_range, maxit=200, alpha=1e-4, tol=1e-3, seed=42, num_avg=5):
 				tol=tol, use_seed=False, 
 				c=c, M=M, A=A, d=d, b=b, 
 				argmin_x=argmin_x, lambda_star=lambda_star, optimal_obj=optimal_obj)[3]
-			# IAAL_time += sim_once(n, maxit=maxit, alpha=alpha, strategy="IAAL", 
-			# 	tol=tol, use_seed=False, 
-			# 	c=c, M=M, A=A, d=d, b=b, 
-			# 	argmin_x=argmin_x, lambda_star=lambda_star, optimal_obj=optimal_obj)[3]
+
 			ADMM_tuple = sim_once(n, maxit=maxit, alpha=alpha, strategy="ADMM", 
 				tol=tol, use_seed=False, 
 				c=c, M=M, A=A, d=d, b=b, 
@@ -83,8 +81,8 @@ def sim_multi(n_range, maxit=200, alpha=1e-4, tol=1e-3, seed=42, num_avg=5):
 			if n == 10 or (n != 10 and not ADMM_max_check):
 				ADMM_time += ADMM_tuple[3]
 				ADMM_count += 1
+
 		default_time_list.append(default_time / num_avg)
-		# IAAL_time_list.append(IAAL_time / num_avg)
 		ADMM_time_list.append(ADMM_time / ADMM_count)
 	return default_time_list, IAAL_time_list, ADMM_time_list
 

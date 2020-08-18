@@ -64,9 +64,6 @@ def general_basic_solver(c, M, A, d, b, is_coupled=True, augmented=False, P=None
 
     if augmented:
         # TODO: check
-#         P = np.concatenate(P, axis=0)
-#         P = block_diag(*P)
-#         print(P)
         # TODO: make P PD
         argmin_x = solve_qp(make_PD(P), c, A_ub, b_ub, lb=np.zeros(len(c)))
     else:
@@ -94,11 +91,9 @@ def general_sub_problem_solver(c, M, A, d, b, sub_indices, lambd, augmented, dot
 
     P_sub = None
     if augmented:
-#         w = dot_cache - d
         # TODO: check
         c_sub += rho * np.matmul(w.T, M[sub_indices])
         M_sub_2d = np.concatenate(M[sub_indices], axis=1)
-#         P_sub = rho * np.matmul(np.transpose(M[sub_indices], axes=(0,2,1)), M[sub_indices])
         # TODO: check
         P_sub = rho / 2 * np.matmul(M_sub_2d.T, M_sub_2d)
 
@@ -110,24 +105,22 @@ def general_sub_problem_solver(c, M, A, d, b, sub_indices, lambd, augmented, dot
 # c~n*m, M~n*k*m, d~k, A~n*l*m, b~n*l, lambd~k
 def general_st_sampling_solver(c, M, A, d, b, epoch=10, batch_size=1, alpha=1e-3,
                                decay=False, decay_func=None,
-                               augmented=False, rho=1, prox_type="IAAL",
+                               augmented=False, prox_type="IAAL",
                                ascent_type="full", vr_m_order=2,
                                err_list=[], lambd_list=[], time_hist=[], 
                                lambda_err_list=[], duality_gap_list=[],
                                is_rep=True, is_cyc=False,
                                answer=[], tol=1e-3, optimal_obj=-1, lambda_star=[], 
-                               max_check=[]):
+                               max_check=[], use_seed=True, is_tracking=True):
     # TODO: check
     n, k, m = M.shape
     # convert max to min problem
     c = -c
 
-    # TODO: check
-#     c, M, A, d, b = [np.float_(dt) for dt in [c, M, A, d, b]]
-
-    # # TODO: keep track of error
-    # if len(answer) == 0:
-    #     answer = general_basic_solver(c, M, A, d, b)
+    # TODO: keep track of error
+    assert optimal_obj != -1, "need optimal_obj as stopping criterion"
+    if is_tracking:
+        assert len(lambda_star) > 0, "dual optimal solution required"
 
     # initialize lambda and argmin_x
     lambd, argmin_x = np.zeros(k), np.zeros(n * m)
@@ -143,8 +136,9 @@ def general_st_sampling_solver(c, M, A, d, b, epoch=10, batch_size=1, alpha=1e-3
     argmin_x_t_prev = np.zeros(n * m)
 
     # set seed
-    seed = 42
-    np.random.seed(seed)
+    if use_seed:
+        seed = 42
+        np.random.seed(seed)
 
     # counter
     counter = 0
@@ -181,18 +175,12 @@ def general_st_sampling_solver(c, M, A, d, b, epoch=10, batch_size=1, alpha=1e-3
 
             # TODO: check
             # remove old values from cache
-#             print(counter)
-#             print(argmin_x)
-#             print(dot_cache - d)
-#             print("---")
             prev_Mx = np.matmul(M_2d[:, update_indices], argmin_x[update_indices])
             dot_cache -= prev_Mx
             current_obj -= np.dot(c_1d[update_indices], argmin_x[update_indices])
 
             # TODO: decay
             decayed_alpha = alpha
-#             if s > 230:
-#                 decay = True
             if decay:
                 decayed_alpha = decay_func(alpha, s)
 #                 print(decayed_alpha)
@@ -204,9 +192,6 @@ def general_st_sampling_solver(c, M, A, d, b, epoch=10, batch_size=1, alpha=1e-3
                 w = (dot_cache - d) / n - (n - 1) * prev_Mx / n
 
             # TODO: check
-#             rho = decayed_alpha
-#             if s > 200:
-#                 rho *= 10
             argmin_x_sub = general_sub_problem_solver(c, M, A, d, b, sub_indices, lambd,
                                                       augmented,
                                                       dot_cache,
@@ -222,18 +207,13 @@ def general_st_sampling_solver(c, M, A, d, b, epoch=10, batch_size=1, alpha=1e-3
             current_obj += np.dot(c_1d[update_indices], argmin_x[update_indices])
 
             # TODO: check
-            # lambd += alpha * (dot_cache - d)
             # TODO: VR
             lambd_prev = lambd
             if ascent_type == "vr":
-#                 - batch_size * d / n
                 d_psi_t = np.matmul(M_2d[:, update_indices], argmin_x_t[update_indices])
-#                 - batch_size * d / n
                 # TODO: check
                 mu_t = batch_size * (dot_cache_t - d) / n
-#               lambd = np.maximum(lambd + decayed_alpha * (d_psi), 0)
                 lambd = np.maximum(lambd + decayed_alpha * (d_psi - d_psi_t + mu_t), 0)
-#               lambd = np.maximum(lambd + decayed_alpha * (dot_cache - d - d_psi_t + mu_t), 0)
             elif ascent_type == "full":
                 lambd = np.maximum(lambd + decayed_alpha * (dot_cache - d), 0)
             elif ascent_type == "single":
@@ -248,29 +228,26 @@ def general_st_sampling_solver(c, M, A, d, b, epoch=10, batch_size=1, alpha=1e-3
             counter += 1
             end_time = time.time()
 
-            # # TODO: keep track of error every iter
-            # err = abs(optimal_obj - current_obj) / abs(optimal_obj)
-            # # TODO: Termination
-            # if all(dot_cache <= d) and err < tol:
-            #     # break
-            #     print(current_obj)
-            #     return argmin_x
-
-        # TODO: inner or outer loop
-        # TODO: keep track of runtime
-        time_hist.append(end_time - start_time)
-
-        # TODO: keep track of error and lambd
-        # err = np.linalg.norm(argmin_x - answer)
+        # compute current error
         err = abs(optimal_obj - current_obj) / abs(optimal_obj)
-        err_list.append(err)
-        # TODO: check
-        lambd_list.append(lambd)
-#          print(lambd)
-        lambda_err = np.linalg.norm(lambd - lambda_star) / np.linalg.norm(lambda_star)
-        lambda_err_list.append(lambda_err) 
-        duality_gap = abs(np.dot(lambd.T, dot_cache - d))
-        duality_gap_list.append(duality_gap)
+
+        if is_tracking:
+            # TODO: inner or outer loop
+            # TODO: keep track of runtime
+            time_hist.append(end_time - start_time)
+
+            
+            # TODO: keep track of error and lambd
+            # err = np.linalg.norm(argmin_x - answer)
+            err_list.append(err)
+            # TODO: check
+            lambd_list.append(lambd)
+    #          print(lambd)
+            lambda_err = np.linalg.norm(lambd - lambda_star) / np.linalg.norm(lambda_star)
+            lambda_err_list.append(lambda_err) 
+            duality_gap = abs(np.dot(lambd.T, dot_cache - d))
+            duality_gap_list.append(duality_gap)
+
         # TODO: Termination
         if all(dot_cache <= d) and err < tol:
             break
@@ -280,7 +257,7 @@ def general_st_sampling_solver(c, M, A, d, b, epoch=10, batch_size=1, alpha=1e-3
             dot_cache_t_prev = dot_cache
             argmin_x_t_prev = argmin_x
 
-    print(current_obj)
+    print("Approximated optimal objective value: {}".format(current_obj))
     return argmin_x
 
 def plot_error(err_list, name="Error", required=[]):
