@@ -286,3 +286,15 @@ def log_decay(alpha, k):
 
 def sqrt_decay(alpha, k):
     return alpha / (np.sqrt(k) + 1)
+
+def adaptive(alpha, k):
+    if k < 20:
+        return alpha
+    elif k >= 20 and k < 40:
+        return alpha / 10
+    elif k >= 40 and k < 60:
+        return alpha / 100
+    elif k >= 60 and k < 80:
+        return alpha / 1000
+    else:
+        return alpha / (np.sqrt(k))
